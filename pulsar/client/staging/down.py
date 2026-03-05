@@ -4,6 +4,7 @@ from contextlib import contextmanager
 from json import loads
 from logging import getLogger
 from os.path import (
+    basename,
     join,
     relpath,
 )
@@ -117,10 +118,18 @@ class ResultsCollector:
             output_generated = self.pulsar_outputs.has_output_file(output_file)
             if output_generated:
                 self._attempt_collect_output('output', output_file)
+            else:
+                # Output not in outputs directory - check working directory.
+                # This happens when Galaxy's path rewriting causes tools to
+                # write outputs to the working directory instead of outputs/.
+                output_basename = basename(output_file)
+                if output_basename in self.working_directory_contents:
+                    log.info("Output file %s not in outputs dir, collecting from working dir", output_basename)
+                    if self._attempt_collect_output('output_workdir', path=output_file, name=output_basename):
+                        self.downloaded_working_directory_files.append((output_basename, output_file))
 
             for galaxy_path, pulsar in self.pulsar_outputs.output_extras(output_file).items():
                 self._attempt_collect_output('output', path=galaxy_path, name=pulsar)
-            # else not output generated, do not attempt download.
 
     def __collect_version_file(self):
         version_file = self.client_outputs.version_file

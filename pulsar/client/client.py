@@ -86,7 +86,7 @@ sh $path;
 echo 'ran script'"""
 
 
-PULSAR_CONTAINER_IMAGE = "galaxy/pulsar-pod-staging:0.15.0.0"
+PULSAR_CONTAINER_IMAGE = "ksuderman/pulsar-pod-staging:0.15.15.dev0"
 CONTAINER_STAGING_DIRECTORY = "/pulsar_staging/"
 
 
