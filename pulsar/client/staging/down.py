@@ -231,6 +231,8 @@ class ResultsCollector:
         log.info("collecting output {} with action {}".format(name, action))
         try:
             return self.output_collector.collect_output(self, output_type, action, name)
+        except (ImportError, OSError, MemoryError, SystemError) as e:
+            raise
         except Exception as e:
             if _allow_collect_failure(output_type):
                 log.warning(
