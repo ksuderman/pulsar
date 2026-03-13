@@ -359,6 +359,11 @@ class FileStager:
         if not self.rewrite_paths:
             return True
 
+        # If there is no command line (e.g. parameter tools like param_value_from_file),
+        # we cannot determine which inputs are referenced, so stage them all.
+        if not self.job_inputs.command_line:
+            return True
+
         # If we have disabled path rewriting, just assume everything needs to be transferred,
         # else check to ensure the file is referenced before transferring it.
         return self.job_inputs.path_referenced(source['path'])

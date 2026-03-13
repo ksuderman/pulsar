@@ -236,6 +236,18 @@ def gcp_job_template(params: GcpJobParams) -> "batch_v1.Job":
     environment = batch_v1.Environment(variables=env_vars)
     task.environment = environment
 
+    # Set task-level compute resources so the container gets the full VM resources.
+    # Without this, GCP Batch defaults to 2 vCPU / 2 GB regardless of machine type.
+    compute_resource = batch_v1.ComputeResource()
+    if params.cores is not None:
+        compute_resource.cpu_milli = convert_cpu_to_milli(params.cores)
+    if params.mem is not None:
+        try:
+            compute_resource.memory_mib = int(float(params.mem) * 1024)
+        except (ValueError, TypeError):
+            compute_resource.memory_mib = convert_memory_to_mib(params.mem)
+    task.compute_resource = compute_resource
+
     # Tasks are grouped inside a job using TaskGroups.
     # Currently, it's possible to have only one task group.
     group = batch_v1.TaskGroup()
