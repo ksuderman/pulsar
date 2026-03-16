@@ -141,6 +141,9 @@ class GcpJobParams(BaseModel):
     custom_vm_image: Optional[str] = Field(
         None, description="Custom VM boot disk image URI (e.g., 'projects/my-project/global/images/my-image'). When set, GCP Batch VMs boot from this image instead of the default."
     )
+    boot_disk_size_gb: Optional[int] = Field(
+        None, description="Boot disk size in GB. Required when custom_vm_image is larger than the default 30 GB boot disk."
+    )
     labels: Optional[Dict[str, str]] = Field(None)
 
 
@@ -272,6 +275,8 @@ def gcp_job_template(params: GcpJobParams) -> "batch_v1.Job":
     if params.custom_vm_image:
         boot_disk = batch_v1.AllocationPolicy.Disk()
         boot_disk.image = params.custom_vm_image
+        if params.boot_disk_size_gb:
+            boot_disk.size_gb = params.boot_disk_size_gb
         policy.boot_disk = boot_disk
 
     attached_disk = batch_v1.AllocationPolicy.AttachedDisk()
