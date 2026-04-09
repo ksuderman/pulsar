@@ -62,9 +62,9 @@ All changes are on the `ksuderman/pulsar@gcp-fixes` branch, forked from `master`
 **Commit:** `0f7f695`
 **Files:** `pulsar/client/container_job_config.py`, `pulsar/client/staging/up.py`
 
-**Problem:** Galaxy "parameter tools" like `param_value_from_file` have no command line — they read an input file and extract a value. The input staging logic in `FileStager` calls `path_referenced(source['path'])` to check if an input file appears in the command line before staging it. With an empty/null command line, no inputs matched, so nothing was staged. The tool received no input files and failed.
+~~**Problem:** Galaxy "parameter tools" like `param_value_from_file` have no command line — they read an input file and extract a value. The input staging logic in `FileStager` calls `path_referenced(source['path'])` to check if an input file appears in the command line before staging it. With an empty/null command line, no inputs matched, so nothing was staged. The tool received no input files and failed.~~
 
-**Fix:** In `up.py`, added a check: if `self.job_inputs.command_line` is falsy, return `True` (stage all inputs). This ensures parameter tools that lack a command line still get their input files staged.
+~~**Fix:** In `up.py`, added a check: if `self.job_inputs.command_line` is falsy, return `True` (stage all inputs). This ensures parameter tools that lack a command line still get their input files staged.~~
 
 ### 5. Re-raise infrastructure errors during output collection
 
@@ -176,32 +176,12 @@ New functions in `gcp_util.py`:
 **Commit:** `d4946f9`
 **Files:** `pulsar/client/client.py`
 
-**Problem:** `GcpPollingCoexecutionJobClient.kill()` unconditionally deleted the GCP Batch job. This made debugging impossible because Cloud Logging entries and job metadata were lost. `GcpMessageCoexecutionJobClient` had no `kill()` method at all, causing an error loop when Galaxy tried to cancel AMQP-based jobs.
+**Problem:** `GcpPollingCoexecutionJobClient.kill()` unconditionally deleted the GCP Batch job. This made debugging difficult because Cloud Logging entries and job metadata were lost. `GcpMessageCoexecutionJobClient` had no `kill()` method at all, causing an error loop when Galaxy tried to cancel AMQP-based jobs.
 
 **Fix:**
 - Added `kill()` to `GcpMessageCoexecutionJobClient`.
 - Both `kill()` implementations now check the `delete_batch_job` destination parameter (default: `true`). When set to `false`, jobs are preserved for debugging.
 - Both methods wrap `delete_gcp_job()` in a try/except so a failed deletion doesn't cascade.
-
----
-
-## Custom Sidecar Image
-
-The upstream sidecar image `galaxy/pulsar-pod-staging:0.15.0.2` does not contain any of the above fixes. Fixes 1–5 and 8 run in the sidecar (via `postprocess()` in `pulsar/managers/staging/post.py`), so a custom sidecar image is required.
-
-**Image:** `ksuderman/pulsar-pod-staging:0.15.15.dev0`
-**Dockerfile:** `/Users/suderman/Workspaces/JHU/galaxy-k8s-boot/docker/pulsar-fix/Dockerfile.sidecar`
-**Base:** `python:3.11-slim` (minimal, no CVMFS/SLURM/DRMAA)
-**Installs:** `pulsar-app` from `ksuderman/pulsar@gcp-fixes` with `galaxy_extended_metadata,amqp` extras, plus `requests-toolbelt`
-
-**Required extras:**
-- `galaxy_extended_metadata` — for `galaxy-job-execution` and `galaxy-util[template]`
-- `amqp` — for `kombu`, required for AMQP messaging back to Galaxy. Without this, the sidecar crashes on startup with `"Attempting to bind to AMQP message queue, but kombu dependency unavailable"`.
-
-**Required pip packages:**
-- `requests-toolbelt` — HTTP multipart file upload transport. The sidecar uploads outputs to Galaxy via HTTP using `post_file()`. Pulsar's transport fallback chain is `pycurl` → `requests-toolbelt` → `poster`. Without any of these, all uploads silently fail.
-
-**Important — sidecar image override:** Galaxy's `PulsarGcpBatchJobRunner` sets a default `pulsar_container_image: galaxy/pulsar-pod-staging:0.15.0.2` via `COEXECUTION_DESTINATION_DEFAULTS`. This overrides the `PULSAR_CONTAINER_IMAGE` constant in `client.py`. To use the custom sidecar image, you **must** set `pulsar_container_image` explicitly in the TPV destination params for the `pulsar_gcp` destination (see `mixins/pulsar-batch.yml` in `galaxy-k8s-boot`).
 
 ---
 
@@ -211,11 +191,11 @@ The upstream sidecar image `galaxy/pulsar-pod-staging:0.15.0.2` does not contain
 - Fix 1: Sidecar background mode (`7c083d9`)
 - Fix 2: Runnable ordering (`8942a97`)
 - Fix 3: Working directory output collection (`1d670aa`)
-- Fix 4: Input staging for parameter tools (`0f7f695`)
+- ~~Fix 4: Input staging for parameter tools (`0f7f695`)~~
 - Fix 5: Re-raise infrastructure errors (`fe5a414`)
 - Fix 8: CVMFS volume mounts (`42af808`)
 
-These are required for multi-tool workflows to complete on GCP Batch. Without them, the sidecar deadlocks (fixes 1/2), intermediate outputs are lost (fix 3), parameter tools fail (fix 4), infrastructure errors are silently swallowed (fix 5), and tools can't access reference data (fix 8).
+These are required for multi-tool workflows to complete on GCP Batch. Without them, the sidecar deadlocks (fixes 1/2), intermediate outputs are lost (fix 3), ~~parameter tools fail (fix 4),~~ infrastructure errors are silently swallowed (fix 5), and tools can't access reference data (fix 8).
 
 ### PR 2: Custom VM image support
 - Fix 6: `custom_vm_image` parameter (`00b72e4`)
@@ -229,6 +209,3 @@ These are required for multi-tool workflows to complete on GCP Batch. Without th
 - Fix 12: Unique job names (`12569f2`)
 - Fix 13: Configurable `job_id_prefix` (`cda8bd2`)
 - Fix 14: Optional job deletion / `kill()` method (`d4946f9`)
-
-### Existing Galaxy PR
-- [galaxyproject/galaxy#21928](https://github.com/galaxyproject/galaxy/pull/21928) -- `max_run_duration` support for GCP Batch runner (merged)
